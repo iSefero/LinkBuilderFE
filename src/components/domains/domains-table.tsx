@@ -68,8 +68,14 @@ export function DomainsTable() {
   const { data: users = [] } = useUsers();
   const updateDomain = useUpdateDomain();
 
-  const { filters, setFilters, setPage, setPageSize, resetFilters, hasActiveFilters } =
-    useDomainFilters();
+  const {
+    filters,
+    setFilters,
+    setPage,
+    setPageSize,
+    resetFilters,
+    hasActiveFilters,
+  } = useDomainFilters();
   const [createOpen, setCreateOpen] = useState(false);
   const [addServerOpen, setAddServerOpen] = useState(false);
   const [pendingServerDomainId, setPendingServerDomainId] = useState<
@@ -613,7 +619,7 @@ export function DomainsTable() {
           onOpenChange={(open) => !open && setEditVersion(null)}
           title="Редактировать версию"
           value={editVersion.value}
-          placeholder="v1.0.0 или https://..."
+          placeholder="https://web.archive.org/web/..."
           onSave={async (value) => {
             await patch(editVersion.id, { version: value });
             setEditVersion(null);

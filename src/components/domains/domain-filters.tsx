@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,10 @@ import {
 } from "@/components/ui/select";
 import { BREAKDOWN_LABELS, STATUS_LABELS } from "@/lib/constants";
 import { Breakdown, Priority, Status } from "@/lib/types";
+import {
+  arrayEquals,
+  useDebouncedFilterField,
+} from "@/hooks/use-debounced-filter";
 import { PriorityFilterSelect } from "./colored-selects";
 import { MultiSelectFilter } from "./multi-select-filter";
 import { BreakdownBadge, StatusBadge } from "./enum-badges";
@@ -45,7 +50,11 @@ export const defaultFilters: DomainFiltersState = {
 
 type DomainFiltersProps = {
   filters: DomainFiltersState;
-  onChange: (filters: DomainFiltersState) => void;
+  onChange: (
+    next:
+      | DomainFiltersState
+      | ((prev: DomainFiltersState) => DomainFiltersState)
+  ) => void;
   onReset: () => void;
   hasActiveFilters: boolean;
   responsibles: string[];
@@ -85,6 +94,35 @@ export function DomainFilters({
   const set = (patch: Partial<DomainFiltersState>) =>
     onChange({ ...filters, ...patch });
 
+  const applySearch = useCallback(
+    (search: string) => onChange((prev) => ({ ...prev, search })),
+    [onChange]
+  );
+  const applyBreakdown = useCallback(
+    (breakdown: Breakdown[]) =>
+      onChange((prev) => ({ ...prev, breakdown })),
+    [onChange]
+  );
+  const applyStatus = useCallback(
+    (status: Status[]) => onChange((prev) => ({ ...prev, status })),
+    [onChange]
+  );
+
+  const [searchDraft, setSearchDraft] = useDebouncedFilterField(
+    filters.search,
+    applySearch
+  );
+  const [breakdownDraft, setBreakdownDraft] = useDebouncedFilterField(
+    filters.breakdown,
+    applyBreakdown,
+    arrayEquals
+  );
+  const [statusDraft, setStatusDraft] = useDebouncedFilterField(
+    filters.status,
+    applyStatus,
+    arrayEquals
+  );
+
   return (
     <div className="space-y-3 rounded-xl border border-border/80 bg-card p-3 shadow-sm">
       <div className="flex flex-wrap items-end gap-3">
@@ -97,8 +135,8 @@ export function DomainFilters({
             <Input
               className="pl-8"
               placeholder="example.com"
-              value={filters.search}
-              onChange={(e) => set({ search: e.target.value })}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
             />
           </div>
         </div>
@@ -134,9 +172,11 @@ export function DomainFilters({
 
         <MultiSelectFilter
           label="Детализация"
-          values={filters.breakdown}
+          values={breakdownDraft}
           options={BREAKDOWN_OPTIONS}
-          onChange={(breakdown) => set({ breakdown: breakdown as Breakdown[] })}
+          onChange={(breakdown) =>
+            setBreakdownDraft(breakdown as Breakdown[])
+          }
         />
 
         <FilterSelect
@@ -162,9 +202,9 @@ export function DomainFilters({
 
         <MultiSelectFilter
           label="Статус"
-          values={filters.status}
+          values={statusDraft}
           options={STATUS_OPTIONS}
-          onChange={(status) => set({ status: status as Status[] })}
+          onChange={(status) => setStatusDraft(status as Status[])}
         />
       </div>
     </div>

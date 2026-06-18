@@ -64,21 +64,12 @@ export const MOCK_USERS: User[] = [
 const now = new Date();
 const daysAgo = (days: number, hours = 0) =>
   new Date(
-    now.getTime() - days * 24 * 60 * 60 * 1000 - hours * 60 * 60 * 1000
+    now.getTime() - days * 24 * 60 * 60 * 1000 - hours * 60 * 60 * 1000,
   ).toISOString();
 
-const RESPONSIBLES = [
-  "Иванов Алексей",
-  "Петрова Мария",
-  "Сидоров Дмитрий",
-];
+const RESPONSIBLES = ["Иванов Алексей", "Петрова Мария", "Сидоров Дмитрий"];
 
-const SERVERS = [
-  "192.168.1.10:8080",
-  "192.168.1.11:8080",
-  "10.0.0.5:3000",
-  "",
-];
+const SERVERS = ["192.168.1.10:8080", "192.168.1.11:8080", "10.0.0.5:3000", ""];
 
 const DOMAIN_PREFIXES = [
   "shop",
@@ -117,18 +108,17 @@ const DOMAIN_SUFFIXES = [
 ];
 
 const VERSIONS = [
-  "v1.0.0",
-  "v1.2.4/production",
-  "v2.0.0-rc1",
-  "staging/latest",
-  "release/2024-11/build",
+  "https://web.archive.org/web/20190904062255/http://beccatering.ca",
+  "https://web.archive.org/web/20170930004015/http://www.academiae.it/",
+  "https://web.archive.org/web/20190904062255/http://beccatering.ca",
+  "https://web.archive.org/web/20170912001816/http://festivaldepoesiacba.com.ar/",
+  "https://web.archive.org/web/20170912001816/http://festivaldepoesiacba.com.ar/",
   "нет нормальных снапшотов",
   "https://web.archive.org/web/20190717203336/https://maacltd.com/",
   "https://web.archive.org/web/20181120152931/https://mk2025summit.com/",
   "https://web.archive.org/web/20250905174249/https://meetingservices.org/",
   "https://web.archive.org/web/20241206050754/https://elalambretickets.com/",
-  "build/deploy-42/final",
-  "main@abc123def456",
+  "стоп-тематика",
 ];
 
 const ERROR_MESSAGES = [

@@ -40,7 +40,10 @@ type CreateDomainModalProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function CreateDomainModal({ open, onOpenChange }: CreateDomainModalProps) {
+export function CreateDomainModal({
+  open,
+  onOpenChange,
+}: CreateDomainModalProps) {
   const createDomain = useCreateDomain();
   const { data: domains = [] } = useDomains();
   const { data: servers = [] } = useServers();
@@ -67,7 +70,7 @@ export function CreateDomainModal({ open, onOpenChange }: CreateDomainModalProps
   const onSubmit = async (data: FormData) => {
     setError(null);
     const duplicate = domains.some(
-      (d) => d.domain.toLowerCase() === data.domain.toLowerCase()
+      (d) => d.domain.toLowerCase() === data.domain.toLowerCase(),
     );
     if (duplicate) {
       setError("Домен уже существует");
@@ -108,9 +111,15 @@ export function CreateDomainModal({ open, onOpenChange }: CreateDomainModalProps
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="domain">Домен *</Label>
-            <Input id="domain" placeholder="example.com" {...register("domain")} />
+            <Input
+              id="domain"
+              placeholder="example.com"
+              {...register("domain")}
+            />
             {errors.domain && (
-              <p className="text-xs text-destructive">{errors.domain.message}</p>
+              <p className="text-xs text-destructive">
+                {errors.domain.message}
+              </p>
             )}
           </div>
 
@@ -148,11 +157,13 @@ export function CreateDomainModal({ open, onOpenChange }: CreateDomainModalProps
             <Label htmlFor="version">Версия *</Label>
             <Input
               id="version"
-              placeholder="v1.0.0 или https://..."
+              placeholder="https://web.archive.org/web/..."
               {...register("version")}
             />
             {errors.version && (
-              <p className="text-xs text-destructive">{errors.version.message}</p>
+              <p className="text-xs text-destructive">
+                {errors.version.message}
+              </p>
             )}
           </div>
 
