@@ -1,0 +1,209 @@
+"use client";
+
+import { RotateCcw, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
+import { BREAKDOWN_LABELS, STATUS_LABELS } from "@/lib/constants";
+import { Breakdown, Priority, Status } from "@/lib/types";
+import { PriorityFilterSelect } from "./colored-selects";
+import { MultiSelectFilter } from "./multi-select-filter";
+import { BreakdownBadge, StatusBadge } from "./enum-badges";
+
+export type DomainFiltersState = {
+  search: string;
+  wmd: "all" | "yes" | "no";
+  priority: Priority | "all";
+  breakdown: Breakdown[];
+  responsible: string;
+  server: string;
+  status: Status[];
+  prioritySort: "none" | "asc" | "desc";
+  createdAtSort: "asc" | "desc";
+  page: number;
+  pageSize: number;
+};
+
+export const defaultFilters: DomainFiltersState = {
+  search: "",
+  wmd: "all",
+  priority: "all",
+  breakdown: [],
+  responsible: "all",
+  server: "all",
+  status: [],
+  prioritySort: "none",
+  createdAtSort: "desc",
+  page: 1,
+  pageSize: 25,
+};
+
+type DomainFiltersProps = {
+  filters: DomainFiltersState;
+  onChange: (filters: DomainFiltersState) => void;
+  onReset: () => void;
+  hasActiveFilters: boolean;
+  responsibles: string[];
+  servers: string[];
+};
+
+const WMD_OPTIONS = [
+  { value: "all", label: "Все" },
+  { value: "yes", label: "Да" },
+  { value: "no", label: "Нет" },
+] as const;
+
+const BREAKDOWN_OPTIONS = (Object.keys(BREAKDOWN_LABELS) as Breakdown[]).map(
+  (value) => ({
+    value,
+    label: BREAKDOWN_LABELS[value],
+    render: <BreakdownBadge value={value} />,
+  }),
+);
+
+const STATUS_OPTIONS = (Object.keys(STATUS_LABELS) as Status[]).map(
+  (value) => ({
+    value,
+    label: STATUS_LABELS[value],
+    render: <StatusBadge value={value} />,
+  }),
+);
+
+export function DomainFilters({
+  filters,
+  onChange,
+  onReset,
+  hasActiveFilters,
+  responsibles,
+  servers,
+}: DomainFiltersProps) {
+  const set = (patch: Partial<DomainFiltersState>) =>
+    onChange({ ...filters, ...patch });
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/80 bg-card p-3 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[240px] flex-1 space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">
+            Поиск по домену
+          </label>
+          <div className="relative">
+            <Search className="absolute top-2 left-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="example.com"
+              value={filters.search}
+              onChange={(e) => set({ search: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          disabled={!hasActiveFilters}
+          className="border-orange-200 bg-orange-50 text-orange-700 shadow-sm hover:bg-orange-100 hover:text-orange-800 disabled:opacity-40 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300 dark:hover:bg-orange-950/70"
+          onClick={onReset}
+        >
+          <RotateCcw className="mr-1.5 h-4 w-4" />
+          Сбросить фильтры
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <FilterSelect
+          label="WMD"
+          value={filters.wmd}
+          onValueChange={(v) => set({ wmd: v as DomainFiltersState["wmd"] })}
+          options={WMD_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">
+            Приоритет
+          </label>
+          <PriorityFilterSelect
+            value={filters.priority}
+            onValueChange={(v) => set({ priority: v })}
+          />
+        </div>
+
+        <MultiSelectFilter
+          label="Детализация"
+          values={filters.breakdown}
+          options={BREAKDOWN_OPTIONS}
+          onChange={(breakdown) => set({ breakdown: breakdown as Breakdown[] })}
+        />
+
+        <FilterSelect
+          label="Ответственный"
+          value={filters.responsible}
+          onValueChange={(v) => set({ responsible: v })}
+          options={[
+            { value: "all", label: "Все" },
+            ...responsibles.map((r) => ({ value: r, label: r })),
+          ]}
+        />
+
+        <FilterSelect
+          label="Сервер"
+          value={filters.server}
+          onValueChange={(v) => set({ server: v })}
+          options={[
+            { value: "all", label: "Все" },
+            { value: "__empty", label: "Без сервера" },
+            ...servers.map((s) => ({ value: s, label: s })),
+          ]}
+        />
+
+        <MultiSelectFilter
+          label="Статус"
+          values={filters.status}
+          options={STATUS_OPTIONS}
+          onChange={(status) => set({ status: status as Status[] })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onValueChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">
+        {label}
+      </label>
+      <Select
+        value={value as string}
+        onValueChange={(v) => v && onValueChange(v)}
+      >
+        <SelectTrigger className="w-[150px]">
+          <span className="truncate text-sm">{selected?.label ?? "—"}</span>
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
