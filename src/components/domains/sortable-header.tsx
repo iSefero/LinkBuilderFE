@@ -26,10 +26,10 @@ export function SortableHeader({
       variant="ghost"
       size="sm"
       className={cn(
-        "-ml-2 h-8 gap-1 px-2 font-medium",
+        "h-8 w-full justify-start gap-1 px-0 font-medium",
         isActive
           ? "bg-primary/10 text-primary hover:bg-primary/15"
-          : "text-muted-foreground hover:text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
       onClick={onSort}
     >

@@ -149,14 +149,10 @@ function generateMockDomains(count: number): Domain[] {
     const days = i % 90;
     const links =
       i % 4 === 0
-        ? [`https://ref${n}.example.com/utm`]
+        ? `https://ref${n}.example.com/utm`
         : i % 7 === 0
-          ? [
-              `https://link-a-${n}.com`,
-              `https://link-b-${n}.com`,
-              `https://link-c-${n}.com`,
-            ]
-          : [];
+          ? `https://link-a-${n}.com | https://link-b-${n}.com | https://link-c-${n}.com`
+          : "";
 
     return {
       id: `dom-${n}`,

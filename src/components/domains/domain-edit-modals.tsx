@@ -22,7 +22,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { LinksInputList } from "./links-input-list";
+import { normalizeLinksInput } from "@/lib/links-helpers";
+import { LinksTextarea } from "./links-textarea";
 
 type TextEditModalProps = {
   open: boolean;
@@ -94,8 +95,8 @@ export function TextEditModal({
 type LinksEditModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  links: string[];
-  onSave: (links: string[]) => void;
+  links: string;
+  onSave: (links: string) => void;
 };
 
 export function LinksEditModal({
@@ -107,7 +108,7 @@ export function LinksEditModal({
   const [draft, setDraft] = useState(links);
 
   const handleOpenChange = (next: boolean) => {
-    if (next) setDraft(links.length ? links : [""]);
+    if (next) setDraft(links);
     onOpenChange(next);
   };
 
@@ -117,14 +118,14 @@ export function LinksEditModal({
         <DialogHeader>
           <DialogTitle>Редактировать ссылки</DialogTitle>
         </DialogHeader>
-        <LinksInputList links={draft} onChange={setDraft} />
+        <LinksTextarea value={draft} onChange={setDraft} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Отмена
           </Button>
           <Button
             onClick={() => {
-              onSave(draft.filter(Boolean));
+              onSave(normalizeLinksInput(draft));
               onOpenChange(false);
             }}
           >
@@ -162,6 +163,88 @@ export function ResolveErrorDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Нет</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm}>Да, решено</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+type DeleteDomainDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  domainName: string;
+  onConfirm: () => void;
+  isPending?: boolean;
+};
+
+export function DeleteDomainDialog({
+  open,
+  onOpenChange,
+  domainName,
+  onConfirm,
+  isPending,
+}: DeleteDomainDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Удалить домен?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Домен{" "}
+            <span className="font-medium text-foreground">{domainName}</span>{" "}
+            будет удалён без возможности восстановления.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={isPending}
+            onClick={onConfirm}
+          >
+            {isPending ? "Удаление…" : "Удалить"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+type BulkDeleteDomainsDialogProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  count: number;
+  onConfirm: () => void;
+  isPending?: boolean;
+};
+
+export function BulkDeleteDomainsDialog({
+  open,
+  onOpenChange,
+  count,
+  onConfirm,
+  isPending,
+}: BulkDeleteDomainsDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Удалить выбранные домены?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Будет удалено доменов:{" "}
+            <span className="font-medium text-foreground">{count}</span>. Это
+            действие нельзя отменить.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isPending}>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={isPending}
+            onClick={onConfirm}
+          >
+            {isPending ? "Удаление…" : "Удалить"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

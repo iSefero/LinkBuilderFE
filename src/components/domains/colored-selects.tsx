@@ -7,11 +7,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import {
-  BreakdownBadge,
-  PriorityBadge,
-  StatusBadge,
-} from "./enum-badges";
+import { BreakdownBadge, PriorityBadge, StatusBadge } from "./enum-badges";
 import { Breakdown, Priority, Status } from "@/lib/types";
 import {
   BREAKDOWN_LABELS,
@@ -39,13 +35,18 @@ export function PrioritySelect({
       disabled={disabled}
       onValueChange={(v) => v && onValueChange(v as Priority)}
     >
-      <SelectTrigger className={cn("h-8 w-[130px] border-0 bg-transparent p-0 shadow-none", className)}>
-        <PriorityBadge value={value} />
+      <SelectTrigger
+        className={cn(
+          "h-8 w-full border-0 bg-transparent p-0 shadow-none",
+          className,
+        )}
+      >
+        <PriorityBadge className="w-fit" value={value} />
       </SelectTrigger>
       <SelectContent>
         {(Object.keys(PRIORITY_LABELS) as Priority[]).map((key) => (
           <SelectItem key={key} value={key}>
-            <PriorityBadge value={key} />
+            <PriorityBadge className="w-full" value={key} />
           </SelectItem>
         ))}
       </SelectContent>
@@ -58,9 +59,11 @@ export function BreakdownSelect({
   onValueChange,
   disabled,
   className,
+  triggerBadgeClassName,
 }: {
   value: Breakdown;
   onValueChange: (value: Breakdown) => void;
+  triggerBadgeClassName?: string;
 } & SelectBaseProps) {
   return (
     <Select
@@ -68,13 +71,18 @@ export function BreakdownSelect({
       disabled={disabled}
       onValueChange={(v) => v && onValueChange(v as Breakdown)}
     >
-      <SelectTrigger className={cn("h-8 w-[140px] border-0 bg-transparent p-0 shadow-none", className)}>
-        <BreakdownBadge value={value} />
+      <SelectTrigger
+        className={cn(
+          "h-8 w-full border-0 bg-transparent p-0 shadow-none",
+          className,
+        )}
+      >
+        <BreakdownBadge className={triggerBadgeClassName} value={value} />
       </SelectTrigger>
       <SelectContent>
         {(Object.keys(BREAKDOWN_LABELS) as Breakdown[]).map((key) => (
           <SelectItem key={key} value={key}>
-            <BreakdownBadge value={key} />
+            <BreakdownBadge className="w-full" value={key} />
           </SelectItem>
         ))}
       </SelectContent>
@@ -97,13 +105,18 @@ export function StatusSelect({
       disabled={disabled}
       onValueChange={(v) => v && onValueChange(v as Status)}
     >
-      <SelectTrigger className={cn("h-8 w-[160px] border-0 bg-transparent p-0 shadow-none", className)}>
-        <StatusBadge value={value} />
+      <SelectTrigger
+        className={cn(
+          "h-8 w-[160px] border-0 bg-transparent p-0 shadow-none",
+          className,
+        )}
+      >
+        <StatusBadge className="w-full" value={value} />
       </SelectTrigger>
       <SelectContent>
         {(Object.keys(STATUS_LABELS) as Status[]).map((key) => (
           <SelectItem key={key} value={key}>
-            <StatusBadge value={key} />
+            <StatusBadge className="w-full" value={key} />
           </SelectItem>
         ))}
       </SelectContent>

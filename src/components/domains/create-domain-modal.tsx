@@ -14,15 +14,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { Breakdown, Priority } from "@/lib/types";
+import { normalizeLinksInput } from "@/lib/links-helpers";
 import { useCreateDomain, useDomains, useServers } from "@/hooks/use-api";
-import { LinksInputList } from "./links-input-list";
+import { LinksTextarea } from "./links-textarea";
+import { SearchableSelect } from "./searchable-select";
 import { BreakdownSelect, PrioritySelect } from "./colored-selects";
 
 const schema = z.object({
@@ -47,7 +43,7 @@ export function CreateDomainModal({
   const createDomain = useCreateDomain();
   const { data: domains = [] } = useDomains();
   const { data: servers = [] } = useServers();
-  const [links, setLinks] = useState<string[]>([]);
+  const [links, setLinks] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -82,11 +78,11 @@ export function CreateDomainModal({
         priority: data.priority,
         breakdown: data.breakdown,
         version: data.version,
-        links: links.filter(Boolean),
+        links: normalizeLinksInput(links) || undefined,
         server: data.server || undefined,
       });
       reset();
-      setLinks([]);
+      setLinks("");
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка создания");
@@ -96,7 +92,7 @@ export function CreateDomainModal({
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       reset();
-      setLinks([]);
+      setLinks("");
       setError(null);
     }
     onOpenChange(next);
@@ -122,35 +118,36 @@ export function CreateDomainModal({
               </p>
             )}
           </div>
+          <div className="flex gap-2 w-full">
+            <div className="space-y-1 w-full">
+              <Label>Приоритет *</Label>
+              <Controller
+                name="priority"
+                control={control}
+                render={({ field }) => (
+                  <PrioritySelect
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    className="h-8 w-full border border-input bg-background px-2.5 shadow-none"
+                  />
+                )}
+              />
+            </div>
 
-          <div className="space-y-1">
-            <Label>Приоритет *</Label>
-            <Controller
-              name="priority"
-              control={control}
-              render={({ field }) => (
-                <PrioritySelect
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  className="h-8 w-full border border-input bg-background px-2.5 shadow-none"
-                />
-              )}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Детализация *</Label>
-            <Controller
-              name="breakdown"
-              control={control}
-              render={({ field }) => (
-                <BreakdownSelect
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  className="h-8 w-full border border-input bg-background px-2.5 shadow-none"
-                />
-              )}
-            />
+            <div className="space-y-1 w-full">
+              <Label>Детализация *</Label>
+              <Controller
+                name="breakdown"
+                control={control}
+                render={({ field }) => (
+                  <BreakdownSelect
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    className="h-8 w-full border border-input bg-background px-2.5 shadow-none"
+                  />
+                )}
+              />
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -169,7 +166,7 @@ export function CreateDomainModal({
 
           <div className="space-y-1">
             <Label>Доп. ссылки</Label>
-            <LinksInputList links={links} onChange={setLinks} />
+            <LinksTextarea value={links} onChange={setLinks} />
           </div>
 
           <div className="space-y-1">
@@ -178,26 +175,19 @@ export function CreateDomainModal({
               name="server"
               control={control}
               render={({ field }) => (
-                <Select
+                <SearchableSelect
                   value={field.value ? field.value : "__empty"}
                   onValueChange={(v) =>
-                    field.onChange(v === "__empty" ? "" : (v ?? ""))
+                    field.onChange(v === "__empty" ? "" : v)
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <span className="text-sm">
-                      {field.value || "Не выбран"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__empty">Не выбран</SelectItem>
-                    {servers.map((s) => (
-                      <SelectItem key={s.id} value={s.port}>
-                        {s.port}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  triggerClassName="w-full"
+                  searchPlaceholder="Поиск сервера..."
+                  emptyMessage="Сервер не найден"
+                  options={[
+                    { value: "__empty", label: "Не выбран" },
+                    ...servers.map((s) => ({ value: s.port, label: s.port })),
+                  ]}
+                />
               )}
             />
           </div>

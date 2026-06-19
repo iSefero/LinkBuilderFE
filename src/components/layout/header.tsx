@@ -14,7 +14,7 @@ export function Header() {
   if (!user) return null;
 
   return (
-    <header className="border-b border-border/80 bg-card/90 shadow-sm backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-card/90 shadow-sm backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-[100%] items-center justify-between px-4 xl:px-6">
         <nav className="flex items-center gap-1">
           <Link

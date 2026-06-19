@@ -1,15 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type RowSelectionState,
 } from "@tanstack/react-table";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-import { Pencil, Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -32,11 +31,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { filterAndSortDomains } from "@/lib/domain-filters";
+import { hasLinks, parseLinks } from "@/lib/links-helpers";
 import { hasPermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
-import { Breakdown, Priority, Status, type Domain } from "@/lib/types";
+import { Status, type Domain } from "@/lib/types";
 import { useAuth } from "@/providers/auth-provider";
 import {
+  useDeleteDomain,
   useDomains,
   useServers,
   useUpdateDomain,
@@ -48,6 +49,8 @@ import { DomainFilters } from "./domain-filters";
 import { CreateDomainModal } from "./create-domain-modal";
 import { AddServerModal } from "./add-server-modal";
 import {
+  BulkDeleteDomainsDialog,
+  DeleteDomainDialog,
   LinksEditModal,
   ResolveErrorDialog,
   TextEditModal,
@@ -57,9 +60,10 @@ import {
   PrioritySelect,
   StatusSelect,
 } from "./colored-selects";
-import { SortableHeader, cycleSort, toggleDateSort } from "./sortable-header";
-import { CopyLinkActions } from "./copy-link-actions";
+import { SortableHeader, cycleSort } from "./sortable-header";
+import { CellWithActions } from "./cell-with-actions";
 import { DomainsPagination } from "./domains-pagination";
+import { SearchableSelect } from "./searchable-select";
 
 export function DomainsTable() {
   const { user } = useAuth();
@@ -67,6 +71,7 @@ export function DomainsTable() {
   const { data: servers = [] } = useServers();
   const { data: users = [] } = useUsers();
   const updateDomain = useUpdateDomain();
+  const deleteDomainMutation = useDeleteDomain();
 
   const {
     filters,
@@ -88,7 +93,7 @@ export function DomainsTable() {
   } | null>(null);
   const [editLinks, setEditLinks] = useState<{
     id: string;
-    links: string[];
+    links: string;
   } | null>(null);
   const [editError, setEditError] = useState<{
     id: string;
@@ -103,6 +108,12 @@ export function DomainsTable() {
     newStatus: Status;
     errorMessage: string;
   } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    domain: string;
+  } | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const responsibles = useMemo(
     () => [...new Set(users.map((u) => u.fullName).filter(Boolean))],
@@ -125,6 +136,24 @@ export function DomainsTable() {
     const start = (currentPage - 1) * filters.pageSize;
     return filtered.slice(start, start + filters.pageSize);
   }, [filtered, currentPage, filters.pageSize]);
+
+  const canDeleteDomain = hasPermission(user, "domain", "delete");
+
+  useEffect(() => {
+    setRowSelection({});
+  }, [
+    currentPage,
+    filters.pageSize,
+    filters.search,
+    filters.wmd,
+    filters.priority,
+    filters.breakdown,
+    filters.responsible,
+    filters.server,
+    filters.status,
+  ]);
+
+  const selectedCount = Object.values(rowSelection).filter(Boolean).length;
 
   const patch = async (
     id: string,
@@ -149,8 +178,60 @@ export function DomainsTable() {
     await patch(domain.id, { status: newStatus });
   };
 
+  const handleDeleteDomain = async () => {
+    if (!deleteTarget) return;
+    await deleteDomainMutation.mutateAsync(deleteTarget.id);
+    const remaining = totalFiltered - 1;
+    const newTotalPages = Math.max(1, Math.ceil(remaining / filters.pageSize));
+    if (currentPage > newTotalPages) {
+      setPage(newTotalPages);
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+    if (ids.length === 0) return;
+    await deleteDomainMutation.mutateAsync(ids);
+    const remaining = totalFiltered - ids.length;
+    const newTotalPages = Math.max(1, Math.ceil(remaining / filters.pageSize));
+    if (currentPage > newTotalPages) {
+      setPage(newTotalPages);
+    }
+    setRowSelection({});
+    setBulkDeleteOpen(false);
+  };
+
   const columns = useMemo<ColumnDef<Domain>[]>(
     () => [
+      ...(canDeleteDomain
+        ? [
+            {
+              id: "select",
+              header: ({ table }) => (
+                <div className="flex h-8 items-center justify-center">
+                  <Checkbox
+                    checked={table.getIsAllPageRowsSelected()}
+                    onCheckedChange={(checked) =>
+                      table.toggleAllPageRowsSelected(checked === true)
+                    }
+                  />
+                </div>
+              ),
+              cell: ({ row }) => (
+                <div className="flex h-8 items-center justify-center">
+                  <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(checked) =>
+                      row.toggleSelected(checked === true)
+                    }
+                  />
+                </div>
+              ),
+              enableSorting: false,
+            } satisfies ColumnDef<Domain>,
+          ]
+        : []),
       {
         accessorKey: "domain",
         header: "Домен",
@@ -158,46 +239,53 @@ export function DomainsTable() {
           const d = row.original;
           const canUpdate = hasPermission(user, "domain", "update");
           return (
-            <CellWithEdit
-              canEdit={canUpdate}
-              onEdit={() => setEditDomain({ id: d.id, value: d.domain })}
+            <CellWithActions
+              actions={{
+                value: d.domain,
+                copyTitle: "Скопировать домен",
+                href: toExternalUrl(d.domain),
+                openTitle: "Открыть домен",
+                onEdit: canUpdate
+                  ? () => setEditDomain({ id: d.id, value: d.domain })
+                  : undefined,
+              }}
             >
-              <div className="flex items-center gap-0.5">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="max-w-[200px] min-w-20 truncate font-medium">
-                        {d.domain}
-                      </span>
-                    }
-                  />
-                  <TooltipContent side="top" className="max-w-sm break-all">
-                    {d.domain}
-                  </TooltipContent>
-                </Tooltip>
-                <CopyLinkActions
-                  value={d.domain}
-                  copyTitle="Скопировать домен"
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span className="block w-full min-w-20 max-w-[200px] truncate font-medium">
+                      {d.domain}
+                    </span>
+                  }
                 />
-              </div>
-            </CellWithEdit>
+                <TooltipContent side="top" className="max-w-sm break-all">
+                  {d.domain}
+                </TooltipContent>
+              </Tooltip>
+            </CellWithActions>
           );
         },
       },
       {
         accessorKey: "wmd",
-        header: "WMD",
+        header: () => (
+          <div className="flex h-8 items-center justify-center text-sm font-medium">
+            WMD
+          </div>
+        ),
         cell: ({ row }) => {
           const d = row.original;
           const canUpdate = hasPermission(user, "wmd", "update");
           return (
-            <Checkbox
-              checked={d.wmd}
-              disabled={!canUpdate || updateDomain.isPending}
-              onCheckedChange={(checked) =>
-                patch(d.id, { wmd: checked === true })
-              }
-            />
+            <div className="flex h-8 items-center justify-center">
+              <Checkbox
+                checked={d.wmd}
+                disabled={!canUpdate || updateDomain.isPending}
+                onCheckedChange={(checked) =>
+                  patch(d.id, { wmd: checked === true })
+                }
+              />
+            </div>
           );
         },
       },
@@ -236,6 +324,7 @@ export function DomainsTable() {
           return (
             <BreakdownSelect
               value={d.breakdown}
+              triggerBadgeClassName="w-full"
               disabled={!canUpdate || updateDomain.isPending}
               onValueChange={(v) => patch(d.id, { breakdown: v })}
             />
@@ -249,35 +338,32 @@ export function DomainsTable() {
           const d = row.original;
           const canUpdate = hasPermission(user, "domain", "update");
           return (
-            <CellWithEdit
-              canEdit={canUpdate}
-              onEdit={() => setEditVersion({ id: d.id, value: d.version })}
+            <CellWithActions
+              actions={{
+                value: d.version || undefined,
+                href: d.version ? toExternalUrl(d.version) : undefined,
+                copyTitle: "Скопировать версию",
+                openTitle: "Перейти к версии",
+                onEdit: canUpdate
+                  ? () => setEditVersion({ id: d.id, value: d.version })
+                  : undefined,
+              }}
             >
-              <div className="flex items-start min-w-50 gap-0.5">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span className="block max-w-[200px] truncate text-sm">
-                        {d.version || "—"}
-                      </span>
-                    }
-                  />
-                  {d.version && (
-                    <TooltipContent side="top" className="max-w-sm break-all">
-                      {d.version}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span className="block max-w-[100px] truncate text-sm">
+                      {d.version || "—"}
+                    </span>
+                  }
+                />
                 {d.version && (
-                  <CopyLinkActions
-                    value={d.version}
-                    href={toExternalUrl(d.version)}
-                    copyTitle="Скопировать версию"
-                    openTitle="Перейти к версии"
-                  />
+                  <TooltipContent side="top" className="max-w-sm break-all">
+                    {d.version}
+                  </TooltipContent>
                 )}
-              </div>
-            </CellWithEdit>
+              </Tooltip>
+            </CellWithActions>
           );
         },
       },
@@ -287,23 +373,29 @@ export function DomainsTable() {
         cell: ({ row }) => {
           const d = row.original;
           const canUpdate = hasPermission(user, "links", "update");
+          const parsed = parseLinks(d.links);
           return (
-            <CellWithEdit
-              canEdit={canUpdate}
-              onEdit={() => setEditLinks({ id: d.id, links: d.links })}
+            <CellWithActions
+              actions={
+                canUpdate
+                  ? {
+                      onEdit: () => setEditLinks({ id: d.id, links: d.links }),
+                    }
+                  : undefined
+              }
             >
-              {d.links.length > 0 ? (
+              {hasLinks(d.links) ? (
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <span className="cursor-default text-sm underline decoration-dotted">
-                        {d.links.length} шт.
+                        {parsed.length} шт.
                       </span>
                     }
                   />
                   <TooltipContent>
                     <ul className="max-w-xs space-y-1">
-                      {d.links.map((l, i) => (
+                      {parsed.map((l, i) => (
                         <li key={i} className="truncate text-xs">
                           {l}
                         </li>
@@ -314,7 +406,7 @@ export function DomainsTable() {
               ) : (
                 <span className="text-muted-foreground">—</span>
               )}
-            </CellWithEdit>
+            </CellWithActions>
           );
         },
       },
@@ -371,36 +463,35 @@ export function DomainsTable() {
           const d = row.original;
           const canUpdate = hasPermission(user, "server", "update");
           return (
-            <div className="flex items-center gap-0.5">
-              <Select
+            <CellWithActions
+              actions={
+                d.server
+                  ? {
+                      value: d.server,
+                      href: toServerUrl(d.server),
+                      openTitle: "Перейти на сервер",
+                    }
+                  : undefined
+              }
+            >
+              <SearchableSelect
                 value={d.server || "__empty"}
                 disabled={!canUpdate || updateDomain.isPending}
                 onValueChange={(v) =>
-                  v && patch(d.id, { server: v === "__empty" ? "" : v })
+                  patch(d.id, { server: v === "__empty" ? "" : v })
                 }
-              >
-                <SelectTrigger className="h-8 w-[160px]">
-                  <span className="truncate text-sm">
-                    {d.server || "Не выбран"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__empty">Не выбран</SelectItem>
-                  {serverPorts.map((port) => (
-                    <SelectItem key={port} value={port}>
-                      {port}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {d.server && (
-                <CopyLinkActions
-                  value={d.server}
-                  href={toServerUrl(d.server)}
-                  openTitle="Перейти на сервер"
-                />
-              )}
-            </div>
+                triggerClassName="w-[160px]"
+                searchPlaceholder="Поиск сервера..."
+                emptyMessage="Сервер не найден"
+                options={[
+                  { value: "__empty", label: "Не выбран" },
+                  ...serverPorts.map((port) => ({
+                    value: port,
+                    label: port,
+                  })),
+                ]}
+              />
+            </CellWithActions>
           );
         },
       },
@@ -428,11 +519,18 @@ export function DomainsTable() {
           const canCreate = hasPermission(user, "errorMessage", "create");
           const canEdit = canUpdate || canCreate;
           return (
-            <CellWithEdit
-              canEdit={canEdit}
+            <CellWithActions
               multiline
-              onEdit={() =>
-                setEditError({ id: d.id, value: d.errorMessage ?? "" })
+              actions={
+                canEdit
+                  ? {
+                      onEdit: () =>
+                        setEditError({
+                          id: d.id,
+                          value: d.errorMessage ?? "",
+                        }),
+                    }
+                  : undefined
               }
             >
               {d.errorMessage ? (
@@ -442,39 +540,47 @@ export function DomainsTable() {
               ) : (
                 <span className="text-muted-foreground">—</span>
               )}
-            </CellWithEdit>
+            </CellWithActions>
           );
         },
       },
-      {
-        accessorKey: "createdAt",
-        header: () => (
-          <SortableHeader
-            label="Создано"
-            sort={
-              filters.prioritySort !== "none" ? "none" : filters.createdAtSort
-            }
-            allowNone={false}
-            onSort={() =>
-              setFilters((f) => ({
-                ...f,
-                prioritySort: "none",
-                createdAtSort: toggleDateSort(f.createdAtSort),
-              }))
-            }
-          />
-        ),
-        cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {format(new Date(row.original.createdAt), "dd.MM.yyyy", {
-              locale: ru,
-            })}
-          </span>
-        ),
-      },
+      ...(canDeleteDomain
+        ? [
+            {
+              id: "actions",
+              header: () => <span className="sr-only">Действия</span>,
+              cell: ({ row }: { row: { original: Domain } }) => {
+                const d = row.original;
+                return (
+                  <div className="flex justify-center">
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              setDeleteTarget({ id: d.id, domain: d.domain })
+                            }
+                          />
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </TooltipTrigger>
+                      <TooltipContent>Удалить домен</TooltipContent>
+                    </Tooltip>
+                  </div>
+                );
+              },
+            } satisfies ColumnDef<Domain>,
+          ]
+        : []),
     ],
     [
       user,
+      canDeleteDomain,
       responsibles,
       serverPorts,
       updateDomain.isPending,
@@ -487,13 +593,54 @@ export function DomainsTable() {
     data: paginated,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+    enableRowSelection: canDeleteDomain,
+    onRowSelectionChange: setRowSelection,
+    state: { rowSelection },
   });
 
   const canCreate = hasPermission(user, "domain", "create");
 
+  const stickyHeadClass =
+    "sticky top-0 z-50 bg-muted shadow-[inset_0_-1px_0_0_var(--border)]";
+
+  const getStickyHeadClassForColumn = (columnId: string) => {
+    if (columnId === "select") {
+      return cn(
+        stickyHeadClass,
+        "sticky left-0 z-[65] w-10 min-w-10 px-0 text-center",
+      );
+    }
+    if (columnId === "domain") {
+      return cn(
+        stickyHeadClass,
+        "sticky top-0 z-[60] min-w-[220px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08),inset_-1px_0_0_0_var(--border),inset_0_-1px_0_0_var(--border)]",
+        canDeleteDomain ? "left-10" : "left-0",
+      );
+    }
+    return stickyHeadClass;
+  };
+
+  const getStickyCellClass = (columnId: string, isStriped: boolean) => {
+    const bg = isStriped
+      ? "bg-muted group-hover:bg-accent"
+      : "bg-card group-hover:bg-accent";
+    if (columnId === "select") {
+      return cn("sticky left-0 z-20 w-10 min-w-10 px-0 text-center", bg);
+    }
+    if (columnId === "domain") {
+      return cn(
+        "sticky z-20 min-w-[220px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]",
+        canDeleteDomain ? "left-10" : "left-0",
+        bg,
+      );
+    }
+    return undefined;
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex shrink-0 items-center justify-between">
         <h1 className="text-2xl font-semibold">Домены</h1>
         {canCreate && (
           <Button onClick={() => setCreateOpen(true)}>
@@ -503,25 +650,37 @@ export function DomainsTable() {
         )}
       </div>
 
-      <DomainFilters
-        filters={filters}
-        onChange={setFilters}
-        onReset={resetFilters}
-        hasActiveFilters={hasActiveFilters}
-        responsibles={responsibles}
-        servers={serverPorts}
-      />
+      <div className="shrink-0">
+        <DomainFilters
+          filters={filters}
+          onChange={setFilters}
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+          responsibles={responsibles}
+          servers={serverPorts}
+          selectedCount={selectedCount}
+          onBulkDelete={
+            canDeleteDomain ? () => setBulkDeleteOpen(true) : undefined
+          }
+          onClearSelection={
+            canDeleteDomain ? () => setRowSelection({}) : undefined
+          }
+        />
+      </div>
 
-      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
-        <Table>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm">
+        <Table containerClassName="min-h-0 flex-1 overflow-auto overscroll-contain">
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
               <TableRow
                 key={hg.id}
-                className="border-b border-border/80 bg-muted/70 hover:bg-muted/70"
+                className="border-b border-border/80 bg-muted hover:bg-muted"
               >
                 {hg.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead
+                    key={header.id}
+                    className={getStickyHeadClassForColumn(header.column.id)}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -553,37 +712,52 @@ export function DomainsTable() {
                 </TableCell>
               </TableRow>
             ) : (
-              table.getRowModel().rows.map((row, index) => (
-                <TableRow
-                  key={row.id}
-                  className={
-                    ((currentPage - 1) * filters.pageSize + index) % 2 === 1
-                      ? "bg-muted/25 hover:bg-muted/40"
-                      : undefined
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row, index) => {
+                const isStriped =
+                  ((currentPage - 1) * filters.pageSize + index) % 2 === 1;
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    className={cn(
+                      "group",
+                      isStriped
+                        ? "bg-muted/25 hover:bg-muted/40"
+                        : "hover:bg-muted/30",
+                      row.getIsSelected() && "bg-primary/5 hover:bg-primary/10",
+                    )}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={getStickyCellClass(
+                          cell.column.id,
+                          isStriped,
+                        )}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
-        <DomainsPagination
-          page={currentPage}
-          pageSize={filters.pageSize}
-          totalFiltered={totalFiltered}
-          totalAll={totalAll}
-          hasActiveFilters={hasActiveFilters}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        <div className="shrink-0 border-t border-border/80">
+          <DomainsPagination
+            page={currentPage}
+            pageSize={filters.pageSize}
+            totalFiltered={totalFiltered}
+            totalAll={totalAll}
+            hasActiveFilters={hasActiveFilters}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
       </div>
 
       <CreateDomainModal open={createOpen} onOpenChange={setCreateOpen} />
@@ -675,38 +849,25 @@ export function DomainsTable() {
           }}
         />
       )}
-    </div>
-  );
-}
 
-function CellWithEdit({
-  children,
-  canEdit,
-  onEdit,
-  multiline,
-}: {
-  children: React.ReactNode;
-  canEdit: boolean;
-  onEdit: () => void;
-  multiline?: boolean;
-}) {
-  return (
-    <div
-      className={cn("flex gap-1", multiline ? "items-start" : "items-center")}
-    >
-      {children}
-      {canEdit && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className={cn(
-            "h-6 w-6 shrink-0 opacity-50 hover:opacity-100",
-            multiline && "mt-0.5",
-          )}
-          onClick={onEdit}
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
+      {deleteTarget && (
+        <DeleteDomainDialog
+          open
+          onOpenChange={(open) => !open && setDeleteTarget(null)}
+          domainName={deleteTarget.domain}
+          isPending={deleteDomainMutation.isPending}
+          onConfirm={handleDeleteDomain}
+        />
+      )}
+
+      {bulkDeleteOpen && (
+        <BulkDeleteDomainsDialog
+          open
+          onOpenChange={setBulkDeleteOpen}
+          count={selectedCount}
+          isPending={deleteDomainMutation.isPending}
+          onConfirm={handleBulkDelete}
+        />
       )}
     </div>
   );

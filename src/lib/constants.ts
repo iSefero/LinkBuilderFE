@@ -38,7 +38,7 @@ export const COLUMN_AVAILABLE_PERMISSIONS: Record<
   ColumnKey,
   ("create" | "update" | "delete")[]
 > = {
-  domain: ["create", "update"],
+  domain: ["create", "update", "delete"],
   wmd: ["update"],
   priority: ["update"],
   breakdown: ["update"],

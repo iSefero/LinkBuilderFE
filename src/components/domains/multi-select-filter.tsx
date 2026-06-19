@@ -84,8 +84,8 @@ export function MultiSelectFilter({
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[220px] p-2">
-          <div className="mb-2 flex items-center justify-between px-1">
+        <PopoverContent align="start" className="min-w-[200px] w-fit p-2">
+          <div className="mb-2 flex items-center justify-between px-1 border-b border-border/80">
             <span className="text-xs font-medium text-muted-foreground">
               {label}
             </span>

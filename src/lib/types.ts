@@ -56,7 +56,7 @@ export type Domain = {
   priority: Priority;
   breakdown: Breakdown;
   version: string;
-  links: string[];
+  links: string;
   responsible: string;
   server: string;
   status: Status;
@@ -70,7 +70,7 @@ export type CreateDomainInput = {
   priority: Priority;
   breakdown: Breakdown;
   version: string;
-  links?: string[];
+  links?: string;
   server?: string;
 };
 

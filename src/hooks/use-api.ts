@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createDomain,
   createServer,
+  deleteDomains,
   getDomains,
   getServers,
   getUsers,
@@ -46,6 +47,17 @@ export function useUpdateDomain() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateDomainInput }) =>
       updateDomain(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: domainKeys.all });
+    },
+  });
+}
+
+export function useDeleteDomain() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string | string[]) =>
+      deleteDomains(Array.isArray(ids) ? ids : [ids]),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: domainKeys.all });
     },

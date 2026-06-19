@@ -7,7 +7,7 @@ export default function DomainsPage() {
   return (
     <AuthGuard>
       <Header />
-      <main className="mx-auto w-full max-w-[100%] flex-1 px-4 py-4 md:px-6 md:py-6">
+      <main className="mx-auto flex h-[calc(100dvh-3.5rem)] w-full max-w-full flex-col overflow-hidden px-4 py-4 md:px-6 md:py-4">
         <Suspense
           fallback={
             <div className="py-12 text-center text-muted-foreground">

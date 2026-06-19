@@ -40,7 +40,7 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
     priority: input.priority,
     breakdown: input.breakdown,
     version: input.version,
-    links: input.links ?? [],
+    links: input.links ?? "",
     responsible: "",
     server: input.server ?? "",
     status: "waiting" as Domain["status"],
@@ -49,6 +49,16 @@ export async function createDomain(input: CreateDomainInput): Promise<Domain> {
   };
   store.domains.unshift(domain);
   return structuredClone(domain);
+}
+
+export async function deleteDomains(ids: string[]): Promise<void> {
+  await delay();
+  const idSet = new Set(ids);
+  store.domains = store.domains.filter((d) => !idSet.has(d.id));
+}
+
+export async function deleteDomain(id: string): Promise<void> {
+  return deleteDomains([id]);
 }
 
 export async function updateDomain(
